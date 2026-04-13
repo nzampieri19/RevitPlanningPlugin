@@ -145,7 +145,7 @@ namespace RevitPlanningPlugin.Tests.Domain
         // ——— ApproximateArea — криволинейные контуры ———
 
         /// <summary>
-        /// Полукруг (дуга + хорда): площадь должна быть близка к π*r²/2.
+        /// Полукруг (дуга + одна хорда-диаметр): площадь должна быть близка к π*r²/2.
         /// Радиус 10 → ожидаемая площадь ≈ 157.08 м².
         /// Linearized version даёт лучшую оценку, чем только вершины.
         /// </summary>
@@ -155,7 +155,7 @@ namespace RevitPlanningPlugin.Tests.Domain
             double r = 10;
             double expected = Math.PI * r * r / 2; // ≈ 157.08
 
-            // Полукруг: дуга от (-r,0) до (r,0) через (0,r) + хорда обратно
+            // Полукруг: дуга от (-r,0) до (r,0) через верхнюю полуокружность + хорда (диаметр)
             var outerLoop = new List<ContourSegment>
             {
                 new() {
@@ -163,14 +163,10 @@ namespace RevitPlanningPlugin.Tests.Domain
                     Start = new Point2D(-r, 0), End = new Point2D(r, 0),
                     ArcCenter = new Point2D(0, 0), ArcRadius = r, ArcClockwise = false
                 },
-                // Хорда (диаметр) закрывает контур
+                // Один диаметральный отрезок закрывает контур
                 new() {
                     Type = SegmentType.Line,
-                    Start = new Point2D(r, 0), End = new Point2D(0, 0)
-                },
-                new() {
-                    Type = SegmentType.Line,
-                    Start = new Point2D(0, 0), End = new Point2D(-r, 0)
+                    Start = new Point2D(r, 0), End = new Point2D(-r, 0)
                 }
             };
             var contour = new BuildingContour { OuterLoop = outerLoop };
