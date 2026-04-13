@@ -202,7 +202,8 @@ namespace RevitPlanningPlugin.Revit.Elements
             var sketchPlane = GetSketchPlane(doc, level);
             AppliedTracker.Track(sketchPlane.Id);
 
-            // Elevation in meters for curve construction (must match the sketch plane)
+            // Level.Elevation is in Revit internal units (feet); convert to meters
+            // for RevitCurveBuilder which expects meters and converts back to feet internally.
             double elevMeters = level.Elevation * Services.Geometry.UnitConverter.FeetToMeters;
 
             foreach (var partition in variant.Partitions)
@@ -246,7 +247,7 @@ namespace RevitPlanningPlugin.Revit.Elements
 
         private void CreateRooms(Document doc, LayoutVariant variant, Level level)
         {
-            // Room placement point uses level elevation for correct Z positioning
+            // Level.Elevation (feet) → meters for ToXYZ which converts back to feet internally
             double elevMeters = level.Elevation * Services.Geometry.UnitConverter.FeetToMeters;
 
             foreach (var roomLayout in variant.Rooms)

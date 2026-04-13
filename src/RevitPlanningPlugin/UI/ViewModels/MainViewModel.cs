@@ -596,6 +596,8 @@ namespace RevitPlanningPlugin.UI.ViewModels
         public void Dispose()
         {
             _cts?.Dispose();
+            // PlanningApiClient implements IDisposable; MockPlanningApiClient does not.
+            // Conditional cast is intentional for polymorphic disposal.
             (_apiClient as IDisposable)?.Dispose();
         }
     }
