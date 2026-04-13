@@ -200,10 +200,14 @@ namespace RevitPlanningPlugin.Revit.Elements
         private void CreateRoomSeparators(Document doc, LayoutVariant variant, Level level)
         {
             var sketchPlane = GetSketchPlane(doc, level);
+            AppliedTracker.Track(sketchPlane.Id);
+
+            // Elevation in meters for curve construction (must match the sketch plane)
+            double elevMeters = level.Elevation * Services.Geometry.UnitConverter.FeetToMeters;
 
             foreach (var partition in variant.Partitions)
             {
-                var curve = RevitCurveBuilder.BuildCurve(partition, 0);
+                var curve = RevitCurveBuilder.BuildCurve(partition, elevMeters);
                 if (curve == null) continue;
 
                 var curveArray = new CurveArray();
@@ -224,7 +228,7 @@ namespace RevitPlanningPlugin.Revit.Elements
             {
                 foreach (var seg in room.Boundary)
                 {
-                    var curve = RevitCurveBuilder.BuildCurve(seg, 0);
+                    var curve = RevitCurveBuilder.BuildCurve(seg, elevMeters);
                     if (curve == null) continue;
 
                     var ca = new CurveArray();
@@ -242,11 +246,14 @@ namespace RevitPlanningPlugin.Revit.Elements
 
         private void CreateRooms(Document doc, LayoutVariant variant, Level level)
         {
+            // Room placement point uses level elevation for correct Z positioning
+            double elevMeters = level.Elevation * Services.Geometry.UnitConverter.FeetToMeters;
+
             foreach (var roomLayout in variant.Rooms)
             {
                 if (roomLayout.LabelPoint == null) continue;
 
-                var pt = RevitCurveBuilder.ToXYZ(roomLayout.LabelPoint, 0);
+                var pt = RevitCurveBuilder.ToXYZ(roomLayout.LabelPoint, elevMeters);
                 var uv = new UV(pt.X, pt.Y);
 
                 try
@@ -269,10 +276,11 @@ namespace RevitPlanningPlugin.Revit.Elements
             WallType wallType, double wallHeight)
         {
             double heightFeet = wallHeight * Services.Geometry.UnitConverter.MetersToFeet;
+            double elevMeters = level.Elevation * Services.Geometry.UnitConverter.FeetToMeters;
 
             foreach (var partition in variant.Partitions)
             {
-                var curve = RevitCurveBuilder.BuildCurve(partition, 0);
+                var curve = RevitCurveBuilder.BuildCurve(partition, elevMeters);
                 if (curve == null) continue;
 
                 try

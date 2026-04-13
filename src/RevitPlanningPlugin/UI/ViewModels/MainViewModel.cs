@@ -27,7 +27,7 @@ namespace RevitPlanningPlugin.UI.ViewModels
     /// подключение → контур → генерация → каталог вариантов → применение.
     /// Пользователь работает исключительно внутри Revit, без экспорта/импорта.
     /// </summary>
-    public class MainViewModel : ObservableObject
+    public class MainViewModel : ObservableObject, IDisposable
     {
         // ——— Зависимости ———
         private readonly ExternalCommandData _commandData;
@@ -347,6 +347,7 @@ namespace RevitPlanningPlugin.UI.ViewModels
             try
             {
                 SetStatus(GenerationStatus.Loading, "Загрузка списка контуров…");
+                _cts?.Dispose();
                 _cts = new CancellationTokenSource();
 
                 var contours = await _apiClient!.GetContourListAsync(_cts.Token);
@@ -373,6 +374,7 @@ namespace RevitPlanningPlugin.UI.ViewModels
             try
             {
                 SetStatus(GenerationStatus.Loading, $"Загрузка контура '{SelectedContourSummary.Name}'…");
+                _cts?.Dispose();
                 _cts = new CancellationTokenSource();
 
                 var contour = await _apiClient!.GetContourAsync(SelectedContourSummary.Id, _cts.Token);
@@ -430,6 +432,7 @@ namespace RevitPlanningPlugin.UI.ViewModels
                 GenerationElapsed = string.Empty;
                 SetStatus(GenerationStatus.Generating,
                     $"Пакетная генерация {GenerationParams.VariantCount} вариантов…");
+                _cts?.Dispose();
                 _cts = new CancellationTokenSource();
 
                 // Прогресс: 10% — отправка, 80% — ожидание, 10% — обработка
@@ -588,6 +591,12 @@ namespace RevitPlanningPlugin.UI.ViewModels
                 .Cast<Level>()
                 .OrderBy(l => l.Elevation)
                 .First();
+        }
+
+        public void Dispose()
+        {
+            _cts?.Dispose();
+            (_apiClient as IDisposable)?.Dispose();
         }
     }
 }

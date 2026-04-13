@@ -96,7 +96,7 @@ namespace RevitPlanningPlugin.Services.Geometry
                 var vertices = room.Boundary.Select(s => s.Start).ToList();
                 if (vertices.Count < 3) continue;
 
-                var color = RoomColors.GetValueOrDefault(room.Type, "#EEEEEE");
+                var color = RoomColors.TryGetValue(room.Type, out var c) ? c : "#EEEEEE";
                 var path = BuildPolygonPath(vertices, transform);
                 sb.AppendLine($"<path d='{path}' fill='{color}' stroke='#999' stroke-width='0.5' opacity='0.8'/>");
 

@@ -89,6 +89,13 @@ namespace RevitPlanningPlugin.Infrastructure
             {
                 await _execute(parameter);
             }
+            catch (Exception ex)
+            {
+                // Prevent unhandled exception from crashing Revit.
+                // Individual command handlers should handle their own errors,
+                // but this is a safety net to avoid process termination.
+                System.Diagnostics.Debug.WriteLine($"AsyncRelayCommand unhandled exception: {ex}");
+            }
             finally
             {
                 _isExecuting = false;

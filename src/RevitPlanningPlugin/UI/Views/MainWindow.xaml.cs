@@ -18,6 +18,8 @@ namespace RevitPlanningPlugin.UI.Views
             // Инициализируем PasswordBox из сохранённых настроек (DPAPI-расшифрованные)
             ApiKeyBox.Password      = _viewModel.Settings.ApiKey;
             BearerTokenBox.Password = _viewModel.Settings.BearerToken;
+
+            Closed += (_, __) => _viewModel?.Dispose();
         }
 
         /// <summary>

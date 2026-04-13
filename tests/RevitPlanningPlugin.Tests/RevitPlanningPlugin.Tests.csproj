@@ -23,6 +23,8 @@
     <Compile Remove="../../src/RevitPlanningPlugin/App.cs" />
     <Compile Remove="../../src/RevitPlanningPlugin/Commands/**/*.cs" />
     <Compile Remove="../../src/RevitPlanningPlugin/Properties/**/*.cs" />
+    <!-- Исключаем WPF-зависимые инфраструктурные файлы -->
+    <Compile Remove="../../src/RevitPlanningPlugin/Infrastructure/MvvmBase.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +41,10 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NLog" Version="5.2.8" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Bcl.HashCode" Version="1.1.1" />
+    <PackageReference Include="IndexRange" Version="1.0.3" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
 </Project>
