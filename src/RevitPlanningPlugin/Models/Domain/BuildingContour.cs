@@ -26,12 +26,17 @@ namespace RevitPlanningPlugin.Models.Domain
         /// <summary>Единица измерения координат, полученная из API.</summary>
         public string SourceUnit { get; set; } = "m";
 
-        /// <summary>Грубая оценка площади по формуле Шёлейса (Shoelace) для полигона.</summary>
+        /// <summary>
+        /// Оценка площади контура по формуле Шёлейса.
+        /// Для криволинейных сегментов (Arc, Spline, Ellipse, NURBS) включает
+        /// промежуточные точки линеаризации, что даёт лучшее приближение, чем
+        /// использование только вершин полигона.
+        /// </summary>
         public double ApproximateArea
         {
             get
             {
-                var pts = GetOuterVertices();
+                var pts = HasCurvedGeometry ? GetLinearizedVertices() : GetOuterVertices();
                 if (pts.Count < 3) return 0;
                 double area = 0;
                 for (int i = 0; i < pts.Count; i++)
@@ -41,6 +46,76 @@ namespace RevitPlanningPlugin.Models.Domain
                     area -= pts[j].X * pts[i].Y;
                 }
                 return Math.Abs(area) / 2.0;
+            }
+        }
+
+        /// <summary>
+        /// Возвращает аппроксимированные вершины контура, включая промежуточные
+        /// точки для криволинейных сегментов (8 сэмплов на кривую).
+        /// </summary>
+        public List<Point2D> GetLinearizedVertices(int samplesPerCurve = 8)
+        {
+            var vertices = new List<Point2D>();
+            foreach (var seg in OuterLoop)
+            {
+                vertices.Add(seg.Start);
+                if (seg.IsCurved)
+                    vertices.AddRange(GetCurveMidpoints(seg, samplesPerCurve));
+            }
+            return vertices;
+        }
+
+        private static IEnumerable<Point2D> GetCurveMidpoints(ContourSegment seg, int samples)
+        {
+            switch (seg.Type)
+            {
+                case Models.Enums.SegmentType.Arc when seg.ArcCenter != null:
+                {
+                    double cx = seg.ArcCenter.X, cy = seg.ArcCenter.Y;
+                    double radius = seg.Start.DistanceTo(seg.ArcCenter);
+                    double a1 = Math.Atan2(seg.Start.Y - cy, seg.Start.X - cx);
+                    double a2 = Math.Atan2(seg.End.Y - cy, seg.End.X - cx);
+                    double sweep = a2 - a1;
+                    if (seg.ArcClockwise) { if (sweep > 0) sweep -= 2 * Math.PI; }
+                    else { if (sweep < 0) sweep += 2 * Math.PI; }
+
+                    for (int i = 1; i < samples; i++)
+                    {
+                        double t = (double)i / samples;
+                        double angle = a1 + sweep * t;
+                        yield return new Point2D(cx + radius * Math.Cos(angle), cy + radius * Math.Sin(angle));
+                    }
+                    break;
+                }
+
+                case Models.Enums.SegmentType.Spline:
+                case Models.Enums.SegmentType.NurbsSpline:
+                    if (seg.SplineControlPoints != null)
+                        foreach (var cp in seg.SplineControlPoints)
+                            yield return cp;
+                    break;
+
+                case Models.Enums.SegmentType.Ellipse
+                    when seg.EllipseCenter != null && seg.EllipseRadiusX.HasValue && seg.EllipseRadiusY.HasValue:
+                {
+                    double cx = seg.EllipseCenter.X, cy = seg.EllipseCenter.Y;
+                    double rx = seg.EllipseRadiusX.Value, ry = seg.EllipseRadiusY.Value;
+                    double rot = seg.EllipseRotation;
+                    double a1 = seg.EllipseStartAngle ?? 0;
+                    double sweep = (seg.EllipseEndAngle ?? (2 * Math.PI)) - a1;
+
+                    for (int i = 1; i < samples; i++)
+                    {
+                        double t = (double)i / samples;
+                        double angle = a1 + sweep * t;
+                        double ex = rx * Math.Cos(angle);
+                        double ey = ry * Math.Sin(angle);
+                        yield return new Point2D(
+                            cx + ex * Math.Cos(rot) - ey * Math.Sin(rot),
+                            cy + ex * Math.Sin(rot) + ey * Math.Cos(rot));
+                    }
+                    break;
+                }
             }
         }
 

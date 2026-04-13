@@ -2,18 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RevitPlanningPlugin.Models.Domain;
+using RevitPlanningPlugin.Models.Enums;
 
 namespace RevitPlanningPlugin.Services.Geometry
 {
     /// <summary>
     /// Валидация геометрии контура: замкнутость, самопересечения,
     /// площадь, ориентация.
+    /// Для криволинейных сегментов (Arc, Spline, Ellipse, NURBS) используется
+    /// линеаризация (аппроксимация ломаной) для проверки самопересечений.
     /// </summary>
     public class ContourValidator
     {
         private const double ClosureTolerance = 0.001;   // 1 мм
         private const double MinAreaSqM = 1.0;            // мин. площадь 1 м²
         private const double MaxAreaSqM = 1_000_000.0;    // макс. площадь
+        private const int CurveLinearizationSamples = 16; // точек на кривую
 
         public ValidationResult Validate(BuildingContour contour)
         {
@@ -70,20 +74,23 @@ namespace RevitPlanningPlugin.Services.Geometry
 
         private void ValidateSelfIntersections(BuildingContour contour, ValidationResult result)
         {
-            var segments = contour.OuterLoop;
-            for (int i = 0; i < segments.Count; i++)
+            // Linearize all segments into polyline sub-segments and check all non-adjacent pairs.
+            var polyline = BuildLinearizedPolyline(contour.OuterLoop);
+            int n = polyline.Count;
+
+            for (int i = 0; i < n; i++)
             {
-                for (int j = i + 2; j < segments.Count; j++)
+                for (int j = i + 2; j < n; j++)
                 {
-                    // Не проверяем смежные сегменты
-                    if (i == 0 && j == segments.Count - 1) continue;
+                    // Skip last segment paired with first (they share the closure vertex)
+                    if (i == 0 && j == n - 1) continue;
 
                     if (SegmentsIntersect(
-                        segments[i].Start, segments[i].End,
-                        segments[j].Start, segments[j].End))
+                        polyline[i].Item1, polyline[i].Item2,
+                        polyline[j].Item1, polyline[j].Item2))
                     {
                         result.AddError(
-                            $"Самопересечение: сегменты #{i} и #{j}.",
+                            $"Самопересечение контура (сегменты #{i} и #{j}).",
                             "SELF_INTERSECTION");
                         return; // достаточно одного сообщения
                     }
@@ -107,6 +114,124 @@ namespace RevitPlanningPlugin.Services.Geometry
             var signedArea = ComputeSignedArea(contour.GetOuterVertices());
             if (signedArea < 0)
                 result.AddWarning("Контур имеет обход по часовой стрелке. Рекомендуется против часовой.", "CW_ORIENTATION");
+        }
+
+        // ——— Linearization ———
+
+        /// <summary>
+        /// Преобразует список сегментов в список полилинейных пар точек.
+        /// Прямые сегменты → 1 пара; кривые → N пар.
+        /// </summary>
+        private static List<(Point2D, Point2D)> BuildLinearizedPolyline(List<ContourSegment> segments)
+        {
+            var result = new List<(Point2D, Point2D)>();
+            foreach (var seg in segments)
+            {
+                var pts = LinearizeSegment(seg);
+                for (int i = 0; i < pts.Count - 1; i++)
+                    result.Add((pts[i], pts[i + 1]));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Аппроксимирует сегмент набором точек:
+        /// - Line:    [Start, End]
+        /// - Arc:     N+1 точек вдоль дуги (сэмплинг по углу)
+        /// - Spline:  Start + ControlPoints + End
+        /// - Ellipse: N+1 точек вдоль дуги эллипса (сэмплинг по углу)
+        /// - NURBS:   Start + ControlPoints + End
+        /// </summary>
+        private static List<Point2D> LinearizeSegment(ContourSegment seg)
+        {
+            switch (seg.Type)
+            {
+                case SegmentType.Arc:
+                    return LinearizeArc(seg);
+
+                case SegmentType.Spline:
+                case SegmentType.NurbsSpline:
+                    return LinearizeSpline(seg);
+
+                case SegmentType.Ellipse:
+                    return LinearizeEllipse(seg);
+
+                default:
+                    return new List<Point2D> { seg.Start, seg.End };
+            }
+        }
+
+        private static List<Point2D> LinearizeArc(ContourSegment seg)
+        {
+            if (seg.ArcCenter == null)
+                return new List<Point2D> { seg.Start, seg.End };
+
+            double cx = seg.ArcCenter.X;
+            double cy = seg.ArcCenter.Y;
+            double dx1 = seg.Start.X - cx;
+            double dy1 = seg.Start.Y - cy;
+            double dx2 = seg.End.X - cx;
+            double dy2 = seg.End.Y - cy;
+            double a1 = Math.Atan2(dy1, dx1);
+            double a2 = Math.Atan2(dy2, dx2);
+            double radius = Math.Sqrt(dx1 * dx1 + dy1 * dy1);
+
+            double sweep = a2 - a1;
+            if (seg.ArcClockwise)
+            {
+                if (sweep > 0) sweep -= 2 * Math.PI;
+            }
+            else
+            {
+                if (sweep < 0) sweep += 2 * Math.PI;
+            }
+
+            var pts = new List<Point2D>();
+            for (int i = 0; i <= CurveLinearizationSamples; i++)
+            {
+                double t = (double)i / CurveLinearizationSamples;
+                double angle = a1 + sweep * t;
+                pts.Add(new Point2D(cx + radius * Math.Cos(angle), cy + radius * Math.Sin(angle)));
+            }
+            return pts;
+        }
+
+        private static List<Point2D> LinearizeSpline(ContourSegment seg)
+        {
+            var pts = new List<Point2D> { seg.Start };
+            if (seg.SplineControlPoints != null)
+                pts.AddRange(seg.SplineControlPoints);
+            pts.Add(seg.End);
+            return pts;
+        }
+
+        private static List<Point2D> LinearizeEllipse(ContourSegment seg)
+        {
+            if (!seg.EllipseRadiusX.HasValue || !seg.EllipseRadiusY.HasValue)
+                return new List<Point2D> { seg.Start, seg.End };
+
+            double cx = seg.EllipseCenter?.X ?? 0;
+            double cy = seg.EllipseCenter?.Y ?? 0;
+            double rx = seg.EllipseRadiusX.Value;
+            double ry = seg.EllipseRadiusY.Value;
+            double rot = seg.EllipseRotation;
+            double a1 = seg.EllipseStartAngle ?? 0;
+            double a2 = seg.EllipseEndAngle ?? (2 * Math.PI);
+            double sweep = a2 - a1;
+
+            var pts = new List<Point2D>();
+            for (int i = 0; i <= CurveLinearizationSamples; i++)
+            {
+                double t = (double)i / CurveLinearizationSamples;
+                double angle = a1 + sweep * t;
+                double ex = rx * Math.Cos(angle);
+                double ey = ry * Math.Sin(angle);
+                // Apply rotation
+                double x = cx + ex * Math.Cos(rot) - ey * Math.Sin(rot);
+                double y = cy + ex * Math.Sin(rot) + ey * Math.Cos(rot);
+                pts.Add(new Point2D(x, y));
+            }
+            return pts;
         }
 
         // ——— Утилиты ———

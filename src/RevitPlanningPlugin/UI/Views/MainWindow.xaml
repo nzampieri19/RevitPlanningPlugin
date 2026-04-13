@@ -145,6 +145,30 @@
             <Setter Property="HorizontalAlignment"   Value="Left"/>
             <Setter Property="Margin"                Value="4,2"/>
             <Setter Property="Padding"               Value="4,2"/>
+            <!-- Validation error template: красная рамка + подсказка при ошибке ввода -->
+            <Setter Property="Validation.ErrorTemplate">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Border BorderBrush="#E53935" BorderThickness="1.5" CornerRadius="2">
+                                <AdornedElementPlaceholder x:Name="placeholder"/>
+                            </Border>
+                            <TextBlock Text="!" Foreground="#E53935" FontWeight="Bold"
+                                       Margin="3,0,0,0" VerticalAlignment="Center"
+                                       ToolTip="{Binding ElementName=placeholder,
+                                                         Path=AdornedElement.(Validation.Errors)[0].ErrorContent}"/>
+                        </StackPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="ToolTip"
+                            Value="{Binding RelativeSource={RelativeSource Self},
+                                            Path=(Validation.Errors)[0].ErrorContent}"/>
+                    <Setter Property="Background" Value="#FFF8F8"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Window.Resources>
 
@@ -232,7 +256,9 @@
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Таймаут (сек):"
                                                VerticalAlignment="Center" Margin="0,4"/>
                                     <TextBox   Grid.Row="4" Grid.Column="1"
-                                               Text="{Binding Settings.RequestTimeoutSeconds}"
+                                               Text="{Binding Settings.RequestTimeoutSeconds,
+                                                              ValidatesOnExceptions=True,
+                                                              NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}" Margin="4,2"/>
 
                                     <TextBlock Grid.Row="5" Grid.Column="0" Text="Режим Mock API:"
@@ -385,31 +411,36 @@
                                     <TextBlock Grid.Row="0" Grid.Column="0"
                                                Text="Студии:" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="0" Grid.Column="1"
-                                               Text="{Binding GenerationParams.StudioCount, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.StudioCount, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0"
                                                Text="1-комнатные:" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="1" Grid.Column="1"
-                                               Text="{Binding GenerationParams.OneRoomCount, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.OneRoomCount, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <TextBlock Grid.Row="2" Grid.Column="0"
                                                Text="2-комнатные:" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="2" Grid.Column="1"
-                                               Text="{Binding GenerationParams.TwoRoomCount, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.TwoRoomCount, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <TextBlock Grid.Row="3" Grid.Column="0"
                                                Text="3-комнатные:" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="3" Grid.Column="1"
-                                               Text="{Binding GenerationParams.ThreeRoomCount, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.ThreeRoomCount, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <TextBlock Grid.Row="4" Grid.Column="0"
                                                Text="4-комнатные:" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="4" Grid.Column="1"
-                                               Text="{Binding GenerationParams.FourRoomCount, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.FourRoomCount, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <!-- Разделитель -->
@@ -419,13 +450,15 @@
                                     <TextBlock Grid.Row="6" Grid.Column="0"
                                                Text="Мин. площадь квартиры (м²):" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="6" Grid.Column="1"
-                                               Text="{Binding GenerationParams.MinApartmentArea, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.MinApartmentArea, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
 
                                     <TextBlock Grid.Row="7" Grid.Column="0"
                                                Text="Макс. площадь квартиры (м²):" VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="7" Grid.Column="1"
-                                               Text="{Binding GenerationParams.MaxApartmentArea, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.MaxApartmentArea, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
                                 </Grid>
                             </StackPanel>
@@ -453,7 +486,8 @@
                                                Text="Целевая площадь МОП (м², 0=авто):"
                                                VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="0" Grid.Column="1"
-                                               Text="{Binding GenerationParams.MopAreaTarget, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.MopAreaTarget, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
                                     <TextBlock Grid.Row="0" Grid.Column="2"
                                                Text="  0 = AI определяет автоматически"
@@ -463,7 +497,8 @@
                                                Text="Мин. ширина коридора МОП (м):"
                                                VerticalAlignment="Center" Margin="0,3"/>
                                     <TextBox   Grid.Row="1" Grid.Column="1"
-                                               Text="{Binding GenerationParams.MinCorridorWidth, UpdateSourceTrigger=PropertyChanged}"
+                                               Text="{Binding GenerationParams.MinCorridorWidth, UpdateSourceTrigger=PropertyChanged,
+                                                              ValidatesOnExceptions=True, NotifyOnValidationError=True}"
                                                Style="{StaticResource NumericBox}"/>
                                 </Grid>
                             </StackPanel>

@@ -142,7 +142,106 @@ namespace RevitPlanningPlugin.Tests.Domain
             Assert.Equal(new Point2D(0, 5), verts[3]);
         }
 
-        // ——— GenerationHistory / AddGenerationResult ———
+        // ——— ApproximateArea — криволинейные контуры ———
+
+        /// <summary>
+        /// Полукруг (дуга + хорда): площадь должна быть близка к π*r²/2.
+        /// Радиус 10 → ожидаемая площадь ≈ 157.08 м².
+        /// Linearized version даёт лучшую оценку, чем только вершины.
+        /// </summary>
+        [Fact]
+        public void ApproximateArea_SemicircleArc_CloserToActualThanLinear()
+        {
+            double r = 10;
+            double expected = Math.PI * r * r / 2; // ≈ 157.08
+
+            // Полукруг: дуга от (-r,0) до (r,0) через (0,r) + хорда обратно
+            var outerLoop = new List<ContourSegment>
+            {
+                new() {
+                    Type = SegmentType.Arc,
+                    Start = new Point2D(-r, 0), End = new Point2D(r, 0),
+                    ArcCenter = new Point2D(0, 0), ArcRadius = r, ArcClockwise = false
+                },
+                // Хорда (диаметр) закрывает контур
+                new() {
+                    Type = SegmentType.Line,
+                    Start = new Point2D(r, 0), End = new Point2D(0, 0)
+                },
+                new() {
+                    Type = SegmentType.Line,
+                    Start = new Point2D(0, 0), End = new Point2D(-r, 0)
+                }
+            };
+            var contour = new BuildingContour { OuterLoop = outerLoop };
+
+            double linearArea  = contour.GetOuterVertices().Count >= 3
+                ? ComputeShoelace(contour.GetOuterVertices())
+                : 0;
+            double curvedArea  = contour.ApproximateArea;
+
+            // Curved estimate должна быть ближе к реальной площади, чем простая полигональная
+            double errLinear = Math.Abs(linearArea - expected);
+            double errCurved = Math.Abs(curvedArea - expected);
+            Assert.True(errCurved < errLinear,
+                $"Curved area ({curvedArea:F2}) should be closer to {expected:F2} than linear ({linearArea:F2})");
+        }
+
+        /// <summary>
+        /// Прямоугольный контур без дуг — ApproximateArea и GetLinearizedVertices должны
+        /// давать одинаковый результат (нет криволинейных сегментов).
+        /// </summary>
+        [Fact]
+        public void ApproximateArea_RectNoArcs_EqualToLinearizedArea()
+        {
+            var contour = MakeRect(10, 5);
+            // Без дуг linearized == polygon
+            Assert.Equal(contour.ApproximateArea,
+                         ComputeShoelace(contour.GetLinearizedVertices()),
+                         precision: 6);
+        }
+
+        /// <summary>
+        /// GetLinearizedVertices для контура с дугой возвращает больше точек,
+        /// чем GetOuterVertices (только стартовые точки).
+        /// </summary>
+        [Fact]
+        public void GetLinearizedVertices_ArcContour_HasMorePointsThanOuterVertices()
+        {
+            double r = 5;
+            var outerLoop = new List<ContourSegment>
+            {
+                new() {
+                    Type = SegmentType.Arc,
+                    Start = new Point2D(-r, 0), End = new Point2D(r, 0),
+                    ArcCenter = new Point2D(0, 0), ArcRadius = r, ArcClockwise = false
+                },
+                new() { Type = SegmentType.Line, Start = new Point2D(r, 0),  End = new Point2D(0, 0) },
+                new() { Type = SegmentType.Line, Start = new Point2D(0, 0),  End = new Point2D(-r, 0) }
+            };
+            var contour = new BuildingContour { OuterLoop = outerLoop };
+
+            int outerCount      = contour.GetOuterVertices().Count;
+            int linearizedCount = contour.GetLinearizedVertices().Count;
+
+            Assert.True(linearizedCount > outerCount,
+                $"Linearized ({linearizedCount}) should have more points than outer vertices ({outerCount})");
+        }
+
+        // ——— Вспомогательный метод для вычисления площади по Шёлейсу ———
+
+        private static double ComputeShoelace(List<Point2D> pts)
+        {
+            if (pts.Count < 3) return 0;
+            double area = 0;
+            for (int i = 0; i < pts.Count; i++)
+            {
+                var j = (i + 1) % pts.Count;
+                area += pts[i].X * pts[j].Y;
+                area -= pts[j].X * pts[i].Y;
+            }
+            return Math.Abs(area) / 2.0;
+        }
 
         [Fact]
         public void AddGenerationResult_StoresVariants()

@@ -5,6 +5,13 @@ namespace RevitPlanningPlugin.Infrastructure
 {
     /// <summary>
     /// Простой агрегатор событий для связи между модулями без прямых зависимостей.
+    /// Используется как точка расширения: внешние модули (плагины, скрипты, тестовые harness)
+    /// могут подписываться на события <see cref="ContourLoadedEvent"/>,
+    /// <see cref="GenerationCompletedEvent"/>, <see cref="VariantSelectedEvent"/>
+    /// и <see cref="StatusChangedEvent"/> через <see cref="Subscribe{T}"/>.
+    ///
+    /// В текущей версии плагина публикация событий активна, подписки добавляются
+    /// по мере расширения функциональности.
     /// </summary>
     public class EventAggregator
     {
